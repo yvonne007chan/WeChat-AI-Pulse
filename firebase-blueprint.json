@@ -1,0 +1,109 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Information about the application users",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique identifier for the user" },
+        "email": { "type": "string", "format": "email", "description": "User's email address" },
+        "displayName": { "type": "string", "description": "User's name" },
+        "photoUrl": { "type": "string", "description": "URL to the user's profile picture" },
+        "role": { "type": "string", "enum": ["admin", "user"], "description": "User's role in the system" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the user record was created" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Article": {
+      "title": "Article",
+      "description": "Generated and edited article content",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Article ID" },
+        "title": { "type": "string", "description": "Article title" },
+        "content": { "type": "string", "description": "Full HTML content of the article" },
+        "coverImageUrl": { "type": "string", "description": "URL of the active cover image" },
+        "introduction": { "type": "string", "description": "Article introduction" },
+        "sections": { "type": "array", "description": "Article sections" },
+        "conclusion": { "type": "string", "description": "Article conclusion" },
+        "cta": { "type": "string", "description": "Call to action text" },
+        "authorUid": { "type": "string", "description": "UID of the creator" },
+        "viralScore": { "type": "number", "description": "Last calculated viral score" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "content", "authorUid"]
+    },
+    "ABTest": {
+      "title": "A/B Test",
+      "description": "Configuration and results for title/cover A/B testing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "articleId": { "type": "string" },
+        "authorUid": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "paused", "completed"] },
+        "variations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "imageUrl": { "type": "string" },
+              "metrics": {
+                "type": "object",
+                "properties": {
+                  "views": { "type": "number" },
+                  "clicks": { "type": "number" },
+                  "engagement": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "winnerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "articleId", "authorUid", "variations", "status"]
+    },
+    "AnalysisReport": {
+      "title": "Analysis Report",
+      "description": "Viral analysis report for a specific content piece",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Report ID" },
+        "articleId": { "type": "string", "description": "ID of the analyzed article" },
+        "titleScore": { "type": "number", "description": "Score for the title" },
+        "hookScore": { "type": "number", "description": "Score for the opening hook" },
+        "structureScore": { "type": "number", "description": "Score for the content structure" },
+        "viralScore": { "type": "number", "description": "Overall viral score" },
+        "patterns": { "type": "array", "items": { "type": "string" }, "description": "Detected viral patterns" },
+        "suggestions": { "type": "array", "items": { "type": "string" }, "description": "Improvement suggestions" },
+        "improvedTitles": { "type": "array", "items": { "type": "string" }, "description": "Suggested optimized titles" },
+        "authorUid": { "type": "string", "description": "UID of the user who requested the analysis" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "viralScore", "authorUid"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/articles/{articleId}": {
+      "schema": "Article",
+      "description": "Generated articles"
+    },
+    "/analysis_reports/{reportId}": {
+      "schema": "AnalysisReport",
+      "description": "Viral analysis results"
+    },
+    "/ab_tests/{testId}": {
+      "schema": "ABTest",
+      "description": "Article variations and metrics for A/B testing"
+    }
+  }
+}

@@ -1,0 +1,135 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - displayName: string (optional)
+    //   - photoUrl: string (optional)
+    //   - role: string (required, 'admin'|'user')
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: articles
+    // Document ID: {articleId}
+    // Fields:
+    //   - id: string (required)
+    //   - title: string (required)
+    //   - content: string (required)
+    //   - authorUid: string (required)
+    //   - ... (other blocks)
+    //   - createdAt: timestamp (required)
+    //   - updatedAt: timestamp (required)
+    //
+    // Collection: analysis_reports
+    // Document ID: {reportId}
+    // Fields:
+    //   - id: string (required)
+    //   - viralScore: number (required)
+    //   - authorUid: string (required)
+    //   - ...
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "yvonne007chan@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidString(val, min, max) {
+      return val is string && val.size() >= min && val.size() <= max;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'user'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidArticle(data) {
+      return data.keys().hasAll(['id', 'title', 'content', 'authorUid', 'createdAt', 'updatedAt']) &&
+             isValidString(data.title, 1, 500) &&
+             isValidString(data.content, 1, 1000000) &&
+             data.authorUid == request.auth.uid &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             (!('coverImageUrl' in data) || data.coverImageUrl is string);
+    }
+
+    function isValidReport(data) {
+      return data.keys().hasAll(['id', 'viralScore', 'authorUid', 'createdAt']) &&
+             data.viralScore is number && data.viralScore >= 0 && data.viralScore <= 100 &&
+             data.authorUid == request.auth.uid &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidABTest(data) {
+      return data.keys().hasAll(['id', 'articleId', 'authorUid', 'variations', 'status']) &&
+             data.authorUid == request.auth.uid &&
+             data.status in ['active', 'paused', 'completed'] &&
+             data.variations is list;
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+      allow delete: if isAdmin();
+    }
+
+    match /articles/{articleId} {
+      allow read: if isAuthenticated() && (resource.data.authorUid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidArticle(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.authorUid == request.auth.uid && isValidArticle(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.authorUid == request.auth.uid || isAdmin());
+    }
+
+    match /analysis_reports/{reportId} {
+      allow read: if isAuthenticated() && (resource.data.authorUid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidReport(request.resource.data);
+      allow update: if false; // Reports are immutable
+      allow delete: if isAuthenticated() && (resource.data.authorUid == request.auth.uid || isAdmin());
+    }
+
+    match /ab_tests/{testId} {
+      allow read: if isAuthenticated() && (resource.data.authorUid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidABTest(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.authorUid == request.auth.uid && isValidABTest(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.authorUid == request.auth.uid || isAdmin());
+    }
+  }
+}
